@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, CalendarDays, Check, ChevronLeft, ChevronRight, Dumbbell, History, LockKeyhole, LogOut, Plus, Ruler, Save, Scale, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
+import { Activity, BarChart3, CalendarDays, Check, ChevronLeft, ChevronRight, Dumbbell, Flame, History, LockKeyhole, LogOut, Plus, Ruler, Save, Scale, ShieldCheck, Sparkles, Target, Trash2, Trophy } from 'lucide-react';
 import { supabase } from './supabase';
 import './styles.css';
 
@@ -28,8 +28,38 @@ function Auth() {
   return <div className="auth-shell"><section className="auth-card card"><div className="brand auth-brand"><i>F</i><span>FORM<small>PERSONAL TRAINING LOG</small></span></div><LockKeyhole className="auth-lock" /><span className="eyebrow">PRIVATE ACCESS</span><h1>Your training log</h1><p>Sign in to continue. This lock keeps your workout history private and synchronized across your devices.</p><form onSubmit={signIn} className="auth-form"><label>Email<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} /></label><label>Password<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} /></label><button className="primary" type="submit"><ShieldCheck size={18} /> Sign in</button></form>{message && <p className="form-message">{message}</p>}</section></div>;
 }
 
+function Dashboard({ history, measurements, plan, onNavigate }) {
+  const todayRow = history.find(x => x.session_date === iso());
+  const todayDone = todayRow?.details?.workout?.reduce((sum, ex) => sum + ex.sets.filter(Boolean).length, 0) || 0;
+  const todayTotal = todayRow?.details?.workout?.reduce((sum, ex) => sum + ex.sets.length, 0) || plan.reduce((sum, ex) => sum + ex.sets.length, 0);
+  const completed = history.filter(x => x.details?.completed);
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 29);
+  const last30 = completed.filter(x => x.session_date >= iso(cutoff));
+  const setCount = last30.reduce((sum, row) => sum + (row.details?.workout?.reduce((n, ex) => n + ex.sets.filter(Boolean).length, 0) || 0), 0);
+  const latest = measurements.at(-1);
+  const previous = measurements.at(-2);
+  const week = Array.from({ length: 7 }, (_, index) => { const d = new Date(); d.setDate(d.getDate() - (6 - index)); return iso(d); });
+  const trained = new Set(completed.map(x => x.session_date));
+  const recent = completed.slice(0, 3);
+  return <>
+    <section className="dashboard-hero card"><div><span className="pill lime">TODAY'S TRAINING</span><h2>{todayRow?.details?.completed ? 'Workout logged.' : todayDone ? 'Keep the momentum.' : 'Ready when you are.'}</h2><p>{todayDone} of {todayTotal} sets completed today</p><button className="primary" onClick={() => onNavigate('train')}><Dumbbell size={18} /> {todayDone ? 'Continue workout' : 'Start workout'}</button></div><div className="dashboard-ring" style={{ '--value': `${Math.round((todayDone / todayTotal || 0) * 360)}deg` }}><span><b>{Math.round((todayDone / todayTotal || 0) * 100)}%</b><small>TODAY</small></span></div></section>
+    <section className="dashboard-metrics">
+      <article className="card"><History /><span>LAST 30 DAYS</span><b>{last30.length}</b><small>workouts completed</small></article>
+      <article className="card"><Target /><span>TRAINING VOLUME</span><b>{setCount}</b><small>sets completed</small></article>
+      <article className="card"><Scale /><span>LATEST WEIGHT</span><b>{latest?.weight || '—'}</b><small>{latest?.weight ? 'lb' : 'no entry yet'}</small></article>
+      <article className="card"><Ruler /><span>LATEST WAIST</span><b>{latest?.waist || '—'}</b><small>{latest?.waist ? 'cm' : 'no entry yet'}</small></article>
+    </section>
+    <section className="dashboard-grid">
+      <article className="card dashboard-panel"><div className="card-title"><div><span className="eyebrow">CONSISTENCY</span><h2>This week</h2></div><Trophy /></div><div className="week-dots">{week.map(date => <div key={date}><i className={trained.has(date) ? 'on' : ''}>{trained.has(date) && <Check size={14} />}</i><span>{new Date(date + 'T12:00').toLocaleDateString('en', { weekday: 'narrow' })}</span></div>)}</div><p>{week.filter(date => trained.has(date)).length} training days in the last seven days.</p></article>
+      <article className="card dashboard-panel"><div className="card-title"><div><span className="eyebrow">BODY TREND</span><h2>Latest measurements</h2></div><BarChart3 /></div>{latest ? <div className="body-summary"><div><span>WEIGHT</span><b>{latest.weight || '—'} <small>lb</small></b>{previous?.weight && latest.weight ? <em className={latest.weight <= previous.weight ? 'good' : ''}>{(latest.weight - previous.weight).toFixed(1)} since last</em> : null}</div><div><span>WAIST</span><b>{latest.waist || '—'} <small>cm</small></b>{previous?.waist && latest.waist ? <em className={latest.waist <= previous.waist ? 'good' : ''}>{(latest.waist - previous.waist).toFixed(1)} since last</em> : null}</div></div> : <div className="empty-inline">Add your first weight or waist entry.</div>}<button className="link" onClick={() => onNavigate('progress')}>View body progress <ChevronRight /></button></article>
+    </section>
+    <div className="section-head"><div><span className="eyebrow">HISTORY</span><h2>Recent workouts</h2></div><button className="link" onClick={() => onNavigate('history')}>View all <ChevronRight /></button></div>
+    <section className="history-list">{recent.length ? recent.map(row => <article className="card history" key={row.id}><div className="date-block"><b>{row.session_date.slice(-2)}</b><span>{new Date(row.session_date + 'T12:00').toLocaleDateString('en', { month: 'short' }).toUpperCase()}</span></div><div><h3>{row.session_type || 'Workout'}</h3><p>{Math.round((row.completion || 0) * 100)}% complete · {row.details?.workout?.reduce((sum, ex) => sum + ex.sets.filter(Boolean).length, 0) || 0} sets</p></div><div className="status"><Check size={15} /></div></article>) : <div className="empty-state card"><Flame /><h3>Your progress starts here</h3><p>Complete a workout and it will appear on your dashboard.</p></div>}</section>
+  </>;
+}
+
 function App() {
-  const [session, setSession] = useState(null), [loading, setLoading] = useState(true), [tab, setTab] = useState('train');
+  const [session, setSession] = useState(null), [loading, setLoading] = useState(true), [tab, setTab] = useState('home');
   const [selectedDate, setSelectedDate] = useState(iso()), [plan, setPlan] = useState(starterWorkout), [dailyWorkout, setDailyWorkout] = useState(blankSets(starterWorkout));
   const [dailyRowId, setDailyRowId] = useState(null), [dailyComplete, setDailyComplete] = useState(false), [skills, setSkills] = useState(starterSkills);
   const [measurements, setMeasurements] = useState([]), [history, setHistory] = useState([]), [status, setStatus] = useState('');
@@ -72,15 +102,16 @@ function App() {
   const done = dailyWorkout.reduce((sum, ex) => sum + ex.sets.filter(Boolean).length, 0), total = dailyWorkout.reduce((sum, ex) => sum + ex.sets.length, 0);
 
   if (loading) return <div className="loading">Loading FORM…</div>; if (!session) return <Auth />;
-  const nav = [['train', 'Train', Dumbbell], ['history', 'History', CalendarDays], ['skills', 'Skills', Sparkles], ['progress', 'Progress', Activity], ['routine', 'Routine', Save]];
+  const nav = [['home', 'Today', Activity], ['train', 'Train', Dumbbell], ['history', 'History', CalendarDays], ['skills', 'Skills', Sparkles], ['progress', 'Progress', BarChart3], ['routine', 'Routine', Save]];
   return <div className="app"><aside className="sidebar"><div className="brand"><i>F</i><span>FORM<small>PERSONAL TRAINING LOG</small></span></div><nav>{nav.map(([id, label, Icon]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}><Icon /><span>{label}</span></button>)}</nav><div className="privacy-badge"><ShieldCheck /><span>{status || 'Private'}<small>Cloud synchronized</small></span></div><button className="health-link" onClick={() => supabase.auth.signOut()}><LogOut /><span>Lock FORM</span></button></aside><div className="content"><main>
-    <header className="topbar"><div><div className="eyebrow">PRIVATE · SINGLE USER · {status || 'READY'}</div><h1>{tab === 'train' ? 'Daily workout' : tab === 'history' ? 'Training history' : tab === 'skills' ? 'Skill progress' : tab === 'progress' ? 'Body progress' : 'Edit routine'}</h1></div><ShieldCheck className="top-lock" /></header>
+    <header className="topbar"><div><div className="eyebrow">PRIVATE · SINGLE USER · {status || 'READY'}</div><h1>{tab === 'home' ? 'Your progress' : tab === 'train' ? 'Daily workout' : tab === 'history' ? 'Training history' : tab === 'skills' ? 'Skill progress' : tab === 'progress' ? 'Body progress' : 'Edit routine'}</h1></div><ShieldCheck className="top-lock" /></header>
+    {tab === 'home' && <Dashboard history={history} measurements={measurements} plan={plan} onNavigate={setTab} />}
     {tab === 'train' && <><section className="date-toolbar card"><button onClick={() => { const d = new Date(selectedDate + 'T12:00'); d.setDate(d.getDate() - 1); setSelectedDate(iso(d)); }}><ChevronLeft /></button><label><span>WORKOUT DATE</span><input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} /></label><button disabled={selectedDate >= iso()} onClick={() => { const d = new Date(selectedDate + 'T12:00'); d.setDate(d.getDate() + 1); setSelectedDate(iso(d)); }}><ChevronRight /></button></section><section className="workout-summary card"><div><span className="eyebrow">SETS COMPLETED</span><b>{done}<small> / {total}</small></b></div><div className={`session-state ${dailyComplete ? 'complete' : ''}`}>{dailyComplete ? <><Check /> Logged</> : `${Math.round((done / total || 0) * 100)}%`}</div></section><div className="progress"><i style={{ width: `${(done / total || 0) * 100}%` }} /></div><div className="exercise-list">{dailyWorkout.map((ex, i) => <article className="exercise card" key={ex.id}><div className="exercise-num">{String(i + 1).padStart(2, '0')}</div><div className="exercise-main"><span className="eyebrow">{ex.category}</span><h3>{ex.name}</h3><p>{ex.prescription}</p><div className="sets">{ex.sets.map((checked, j) => <button className={checked ? 'checked' : ''} key={j} onClick={() => toggleSet(i, j)}><span>{checked ? <Check size={16} /> : j + 1}</span><b>{ex.reps[j]}</b><small>REPS</small></button>)}</div></div></article>)}</div><div className="workout-actions"><button className="ghost danger" disabled={!dailyRowId} onClick={clearDay}><Trash2 size={17} /> Clear day</button><button className="primary" disabled={!done} onClick={() => saveDay(dailyWorkout, true)}><Check size={18} /> {dailyComplete ? 'Update session' : 'Finish & log session'}</button></div></>}
     {tab === 'history' && <HistoryPage history={history} completed={completedSessions} onOpen={date => { setSelectedDate(date); setTab('train'); }} />}
     {tab === 'skills' && <section className="skill-grid">{skills.map((skill, i) => <article className="skill-card card" key={skill.name}><div className="skill-top"><div className="skill-glyph" style={{ color: skill.accent, borderColor: skill.accent }}>{skill.icon}</div><span>LEVEL <input type="number" min="0" max={skill.stages.length} value={skill.level} onChange={e => saveSkill(i, { ...skill, level: e.target.value })} /></span></div><h2>{skill.name}</h2><label>Progress %<input type="number" min="0" max="100" value={skill.progress} onChange={e => saveSkill(i, { ...skill, progress: e.target.value })} /></label><label>Current focus<input value={skill.next} onChange={e => saveSkill(i, { ...skill, next: e.target.value })} /></label><div className="bar"><i style={{ width: `${skill.progress}%`, background: skill.accent }} /></div></article>)}</section>}
     {tab === 'progress' && <><button className="primary" onClick={addMeasurement}><Plus /> Add today</button><section className="entries">{[...measurements].reverse().map(item => <div className="entry measurement-entry" key={item.id}><span>{item.date}</span><label><Scale size={14} /><input inputMode="decimal" value={item.weight} onChange={e => saveMeasurement({ ...item, weight: e.target.value })} /> lb</label><label><Ruler size={14} /><input inputMode="decimal" value={item.waist} onChange={e => saveMeasurement({ ...item, waist: e.target.value })} /> cm</label></div>)}</section></>}
     {tab === 'routine' && <RoutineEditor plan={plan} savePlan={savePlan} />}
-  </main></div><nav className="bottom-nav">{nav.slice(0, 4).map(([id, label, Icon]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}><Icon /><span>{label}</span></button>)}</nav></div>;
+  </main></div><nav className="bottom-nav">{nav.slice(0, 5).map(([id, label, Icon]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}><Icon /><span>{label}</span></button>)}</nav></div>;
 }
 
 function HistoryPage({ history, completed, onOpen }) {
