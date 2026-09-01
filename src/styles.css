@@ -31,3 +31,7 @@
 
 /* Readable native routine menu */
 .routine-select select{width:100%;border-radius:8px;background:#111619;padding:8px 34px 8px 4px;color-scheme:dark}.routine-select select:focus{box-shadow:0 0 0 1px var(--lime)}.routine-select select option{background:#151a1d;color:#f4f6f3;font:500 15px 'DM Sans';padding:10px}.routine-select select option:checked{background:#30382e;color:var(--lime)}
+
+
+/* Keep all six destinations visible on mobile and tablet */
+@media(max-width:1039px){.bottom-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));justify-content:stretch}.bottom-nav button{min-width:0;padding:0 2px;font-size:8px}.bottom-nav svg{width:19px}}
