@@ -1,4 +1,4 @@
-# FORM Calisthenics Tracker
+# Big D Energy Calisthenics Tracker
 
 A mobile-friendly calisthenics workout and progress tracker built with React + Vite.
 
